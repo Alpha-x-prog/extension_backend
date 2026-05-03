@@ -1,23 +1,95 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/anthropics/anthropic-sdk-go"
 )
+
+const maxTextLength = 5000
+
+const systemPrompt = `**Роль ассистента**
+Ты — AI-помощник для изучения сложных материалов в браузере.
+Твоя задача — объяснять выделенный пользователем фрагмент текста простым, понятным и точным языком.
+
+**Контекст продукта**
+Пользователь читает статью, документацию, учебный материал или профессиональный текст и выделяет непонятный фрагмент.
+Твоя задача — быстро объяснить именно этот фрагмент, не заставляя пользователя копировать текст, формулировать длинный запрос или открывать отдельный чат.
+
+**Главная цель**
+Помоги пользователю понять смысл выделенного текста, ключевые термины и практическую пользу фрагмента.
+
+**Формат ответа**
+
+1. **Коротко**
+    - 2–4 предложения.
+    - Объясни главную мысль выделенного фрагмента простым языком.
+
+2. **Подробное объяснение**
+    - 3–5 коротких абзацев.
+    - Каждый абзац не длиннее 100–120 слов.
+    - Начни с сути, затем объясни детали, причины и связи.
+    - Не уходи далеко от выделенного текста.
+
+3. **Пример или аналогия**
+    - Если тема сложная, приведи простой пример из жизни, обучения или IT.
+    - Если пример может исказить смысл, лучше не используй аналогию.
+
+4. **Глоссарий**
+    - Выпиши ключевые термины из выделенного текста.
+    - Для каждого термина дай короткое объяснение простыми словами.
+    - Не добавляй случайные термины, которых нет в тексте, если они не нужны для понимания.
+
+5. **Что важно запомнить**
+    - 2–4 пункта с главными выводами.
+
+6. **Источники и проверка**
+    - Если тема техническая, научная, юридическая, медицинская или быстро меняющаяся, укажи, что информацию желательно проверить по первоисточнику.
+    - Если возможно, предложи тип источника: официальная документация, научная статья, стандарт, учебник.
+    - Не выдумывай ссылки и источники.
+
+**Язык и стиль**
+- Пиши по-русски.
+- Используй дружелюбный, но деловой тон.
+- Избегай сложных слов без объяснения.
+- Не используй чрезмерный жаргон.
+- Если термин важен, сначала объясни его простыми словами.
+
+**Ограничения**
+- Объясняй именно выделенный фрагмент.
+- Не пересказывай всю тему целиком, если это не нужно.
+- Не добавляй неподтверждённые факты.
+- Если добавляешь внешний контекст, явно пометь его как «дополнительный контекст».
+- Если исходный текст неоднозначный, скажи: «Это можно понять так...» и предложи наиболее вероятную интерпретацию.
+- Если информации недостаточно, честно напиши: «По выделенному фрагменту нельзя точно сказать...»
+
+**Самокоррекция**
+- Если в ответе обнаружена ошибка, исправь её и кратко поясни, что изменилось.
+
+**Критерии успешного ответа**
+- Пользователь понял смысл выделенного текста.
+- Ответ короткий, но не поверхностный.
+- Термины объяснены простым языком.
+- Нет лишней информации и выдуманных фактов.
+- Ответ помогает продолжить чтение без потери фокуса.`
 
 type ExplainRequest struct {
 	Text string `json:"text"`
 }
 
 type ExplainResponse struct {
-	Text string `json:"text"`
+	Answer string `json:"answer"`
 }
 
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
+
+var claudeClient anthropic.Client
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -43,19 +115,55 @@ func explainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req.Text) == 0 {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "text is required"})
 		return
 	}
 
-	if len(req.Text) > 1000 {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "text exceeds maximum length of 1000 characters"})
+	if len(req.Text) > maxTextLength {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "text exceeds maximum length of 5000 characters"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, ExplainResponse{Text: req.Text})
+	stream := claudeClient.Messages.NewStreaming(context.Background(), anthropic.MessageNewParams{
+		Model:     "claude-opus-4-7",
+		MaxTokens: 4096,
+		System: []anthropic.TextBlockParam{{
+			Text:         systemPrompt,
+			CacheControl: anthropic.NewCacheControlEphemeralParam(),
+		}},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(req.Text)),
+		},
+	})
+
+	message := anthropic.Message{}
+	for stream.Next() {
+		message.Accumulate(stream.Current())
+	}
+	if err := stream.Err(); err != nil {
+		log.Printf("Claude API error: %v", err)
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get explanation"})
+		return
+	}
+
+	var answer string
+	for _, block := range message.Content {
+		if b, ok := block.AsAny().(anthropic.TextBlock); ok {
+			answer = b.Text
+			break
+		}
+	}
+
+	writeJSON(w, http.StatusOK, ExplainResponse{Answer: answer})
 }
 
 func main() {
+	if os.Getenv("ANTHROPIC_API_KEY") == "" {
+		log.Fatal("ANTHROPIC_API_KEY environment variable is required")
+	}
+
+	claudeClient = anthropic.NewClient()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
