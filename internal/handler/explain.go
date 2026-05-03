@@ -1,17 +1,17 @@
 package handler
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
-	"fmt"
-	"io"
 	"log"
 	"net/http"
+
+	"google.golang.org/genai"
 )
 
 const maxTextLength = 5000
 
-const geminiModel = "gemini-2.0-flash"
+const geminiModel = "gemini-2.5-flash"
 
 const systemPrompt = `**Роль ассистента**
 Ты — AI-помощник для изучения сложных материалов в браузере.
@@ -78,31 +78,6 @@ const systemPrompt = `**Роль ассистента**
 - Нет лишней информации и выдуманных фактов.
 - Ответ помогает продолжить чтение без потери фокуса.`
 
-// Gemini REST API request/response types
-
-type geminiPart struct {
-	Text string `json:"text"`
-}
-
-type geminiContent struct {
-	Parts []geminiPart `json:"parts"`
-}
-
-type geminiRequest struct {
-	SystemInstruction geminiContent   `json:"system_instruction"`
-	Contents          []geminiContent `json:"contents"`
-}
-
-type geminiCandidate struct {
-	Content geminiContent `json:"content"`
-}
-
-type geminiResponse struct {
-	Candidates []geminiCandidate `json:"candidates"`
-}
-
-// HTTP handler types
-
 type ExplainRequest struct {
 	Text string `json:"text"`
 }
@@ -122,10 +97,13 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func NewExplainHandler(apiKey string) http.HandlerFunc {
-	apiURL := fmt.Sprintf(
-		"https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent",
-		geminiModel,
-	)
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey: apiKey,
+	})
+	if err != nil {
+		log.Fatalf("failed to create Gemini client: %v", err)
+	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -154,62 +132,22 @@ func NewExplainHandler(apiKey string) http.HandlerFunc {
 			return
 		}
 
-		answer, err := callGemini(apiURL, apiKey, req.Text)
+		result, err := client.Models.GenerateContent(
+			r.Context(),
+			geminiModel,
+			genai.Text(req.Text),
+			&genai.GenerateContentConfig{
+				SystemInstruction: &genai.Content{
+					Parts: []*genai.Part{{Text: systemPrompt}},
+				},
+			},
+		)
 		if err != nil {
 			log.Printf("Gemini API error: %v", err)
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get explanation"})
 			return
 		}
 
-		writeJSON(w, http.StatusOK, ExplainResponse{Answer: answer})
+		writeJSON(w, http.StatusOK, ExplainResponse{Answer: result.Text()})
 	}
-}
-
-func callGemini(apiURL, apiKey, text string) (string, error) {
-	body := geminiRequest{
-		SystemInstruction: geminiContent{
-			Parts: []geminiPart{{Text: systemPrompt}},
-		},
-		Contents: []geminiContent{
-			{Parts: []geminiPart{{Text: text}}},
-		},
-	}
-
-	data, err := json.Marshal(body)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(data))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("x-goog-api-key", apiKey)
-
-	resp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		return "", fmt.Errorf("http post: %w", err)
-	}
-	defer resp.Body.Close()
-
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("gemini returned %d: %s", resp.StatusCode, string(raw))
-	}
-
-	var gemResp geminiResponse
-	if err := json.Unmarshal(raw, &gemResp); err != nil {
-		return "", fmt.Errorf("unmarshal response: %w", err)
-	}
-
-	if len(gemResp.Candidates) == 0 || len(gemResp.Candidates[0].Content.Parts) == 0 {
-		return "", fmt.Errorf("empty response from gemini")
-	}
-
-	return gemResp.Candidates[0].Content.Parts[0].Text, nil
 }
