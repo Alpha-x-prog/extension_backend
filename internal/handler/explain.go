@@ -123,8 +123,8 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func NewExplainHandler(apiKey string) http.HandlerFunc {
 	apiURL := fmt.Sprintf(
-		"https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
-		geminiModel, apiKey,
+		"https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent",
+		geminiModel,
 	)
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -154,7 +154,7 @@ func NewExplainHandler(apiKey string) http.HandlerFunc {
 			return
 		}
 
-		answer, err := callGemini(apiURL, req.Text)
+		answer, err := callGemini(apiURL, apiKey, req.Text)
 		if err != nil {
 			log.Printf("Gemini API error: %v", err)
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get explanation"})
@@ -165,7 +165,7 @@ func NewExplainHandler(apiKey string) http.HandlerFunc {
 	}
 }
 
-func callGemini(apiURL, text string) (string, error) {
+func callGemini(apiURL, apiKey, text string) (string, error) {
 	body := geminiRequest{
 		SystemInstruction: geminiContent{
 			Parts: []geminiPart{{Text: systemPrompt}},
@@ -180,7 +180,14 @@ func callGemini(apiURL, text string) (string, error) {
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	resp, err := http.Post(apiURL, "application/json", bytes.NewReader(data))
+	httpReq, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(data))
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-goog-api-key", apiKey)
+
+	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return "", fmt.Errorf("http post: %w", err)
 	}
