@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/Alpha-x-prog/extension_backend/internal/service"
 )
 
 const explainMaxLen = 5000
@@ -81,7 +83,9 @@ type explainResponse struct {
 	Answer string `json:"answer"`
 }
 
-func NewExplainHandler(gc *GeminiClient) http.HandlerFunc {
+// NewExplainHandler handles POST /explain.
+// Accepts {"text": "..."}, returns {"answer": "..."}.
+func NewExplainHandler(gc *service.GeminiClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, ErrorResponse{Error: "method not allowed"})

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/Alpha-x-prog/extension_backend/internal/handler"
+	"github.com/Alpha-x-prog/extension_backend/internal/service"
 )
 
 func main() {
@@ -19,7 +20,7 @@ func main() {
 		port = "8080"
 	}
 
-	gc, err := handler.NewGeminiClient(apiKey)
+	gc, err := service.NewGeminiClient(apiKey)
 	if err != nil {
 		log.Fatalf("failed to create Gemini client: %v", err)
 	}

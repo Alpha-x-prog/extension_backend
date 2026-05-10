@@ -1,4 +1,4 @@
-package handler
+package service
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	geminiModel = "gemini-2.5-flash"
-	aiTimeout   = 30 * time.Second
+	GeminiModel = "gemini-2.5-flash"
+	AITimeout   = 30 * time.Second
 )
 
 var (
@@ -20,12 +20,13 @@ var (
 	ErrAIUnavailable = errors.New("ai service unavailable")
 )
 
-// GeminiClient wraps the Google Generative AI client and is shared across handlers.
+// GeminiClient is a shared wrapper around the Google Generative AI SDK.
+// Create once at startup and pass to all handlers.
 type GeminiClient struct {
 	client *genai.Client
 }
 
-// NewGeminiClient creates a single shared Gemini client. Call once at startup.
+// NewGeminiClient creates a GeminiClient using the provided API key.
 func NewGeminiClient(apiKey string) (*GeminiClient, error) {
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: apiKey})
@@ -36,14 +37,15 @@ func NewGeminiClient(apiKey string) (*GeminiClient, error) {
 }
 
 // Generate sends userText to Gemini with the given systemPrompt.
-// Returns ErrAITimeout on 30-second timeout, ErrAIUnavailable on any other error.
+// The request is cancelled after AITimeout (30 s).
+// Returns ErrAITimeout on deadline exceeded, ErrAIUnavailable on any other error.
 func (g *GeminiClient) Generate(systemPrompt, userText string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), aiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), AITimeout)
 	defer cancel()
 
 	result, err := g.client.Models.GenerateContent(
 		ctx,
-		geminiModel,
+		GeminiModel,
 		genai.Text(userText),
 		&genai.GenerateContentConfig{
 			SystemInstruction: &genai.Content{
@@ -53,10 +55,10 @@ func (g *GeminiClient) Generate(systemPrompt, userText string) (string, error) {
 	)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			log.Printf("Gemini timeout: %v", err)
+			log.Printf("gemini timeout: %v", err)
 			return "", ErrAITimeout
 		}
-		log.Printf("Gemini error: %v", err)
+		log.Printf("gemini error: %v", err)
 		return "", ErrAIUnavailable
 	}
 

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/Alpha-x-prog/extension_backend/internal/service"
 )
 
 const (
@@ -64,7 +66,10 @@ type summaryResponse struct {
 	SummaryMD string `json:"summary_md"`
 }
 
-func NewSummaryHandler(gc *GeminiClient) http.HandlerFunc {
+// NewSummaryHandler handles POST /summary.
+// Accepts {"text": "..."}, returns {"summary_md": "..."}.
+// text: min 300 chars, max 20000 chars.
+func NewSummaryHandler(gc *service.GeminiClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, ErrorResponse{Error: "method not allowed"})

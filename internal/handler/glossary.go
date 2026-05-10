@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/Alpha-x-prog/extension_backend/internal/service"
 )
 
 const (
@@ -62,7 +64,10 @@ type glossaryResponse struct {
 	GlossaryMD string `json:"glossary_md"`
 }
 
-func NewGlossaryHandler(gc *GeminiClient) http.HandlerFunc {
+// NewGlossaryHandler handles POST /glossary.
+// Accepts {"text": "..."}, returns {"glossary_md": "..."}.
+// text: min 100 chars, max 5000 chars.
+func NewGlossaryHandler(gc *service.GeminiClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, ErrorResponse{Error: "method not allowed"})
