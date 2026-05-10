@@ -1,19 +1,14 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
-	"log"
 	"net/http"
-
-	"google.golang.org/genai"
+	"strings"
 )
 
-const maxTextLength = 5000
+const explainMaxLen = 5000
 
-const geminiModel = "gemini-2.5-flash"
-
-const systemPrompt = `**Роль ассистента**
+const explainSystemPrompt = `**Роль ассистента**
 Ты — AI-помощник для изучения сложных материалов в браузере.
 Твоя задача — объяснять выделенный пользователем фрагмент текста простым, понятным и точным языком.
 
@@ -78,33 +73,15 @@ const systemPrompt = `**Роль ассистента**
 - Нет лишней информации и выдуманных фактов.
 - Ответ помогает продолжить чтение без потери фокуса.`
 
-type ExplainRequest struct {
+type explainRequest struct {
 	Text string `json:"text"`
 }
 
-type ExplainResponse struct {
+type explainResponse struct {
 	Answer string `json:"answer"`
 }
 
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
-}
-
-func NewExplainHandler(apiKey string) http.HandlerFunc {
-	ctx := context.Background()
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: apiKey,
-	})
-	if err != nil {
-		log.Fatalf("failed to create Gemini client: %v", err)
-	}
-
+func NewExplainHandler(gc *GeminiClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, ErrorResponse{Error: "method not allowed"})
@@ -116,38 +93,29 @@ func NewExplainHandler(apiKey string) http.HandlerFunc {
 			return
 		}
 
-		var req ExplainRequest
+		var req explainRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
 			return
 		}
 
-		if len(req.Text) == 0 {
+		text := strings.TrimSpace(req.Text)
+		if text == "" {
 			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "text is required"})
 			return
 		}
 
-		if len(req.Text) > maxTextLength {
+		if len(text) > explainMaxLen {
 			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "text exceeds maximum length of 5000 characters"})
 			return
 		}
 
-		result, err := client.Models.GenerateContent(
-			r.Context(),
-			geminiModel,
-			genai.Text(req.Text),
-			&genai.GenerateContentConfig{
-				SystemInstruction: &genai.Content{
-					Parts: []*genai.Part{{Text: systemPrompt}},
-				},
-			},
-		)
+		answer, err := gc.Generate(explainSystemPrompt, text)
 		if err != nil {
-			log.Printf("Gemini API error: %v", err)
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get explanation"})
+			writeAIError(w, err)
 			return
 		}
 
-		writeJSON(w, http.StatusOK, ExplainResponse{Answer: result.Text()})
+		writeJSON(w, http.StatusOK, explainResponse{Answer: answer})
 	}
 }

@@ -19,7 +19,14 @@ func main() {
 		port = "8080"
 	}
 
-	http.HandleFunc("/explain", handler.NewExplainHandler(apiKey))
+	gc, err := handler.NewGeminiClient(apiKey)
+	if err != nil {
+		log.Fatalf("failed to create Gemini client: %v", err)
+	}
+
+	http.HandleFunc("/explain", handler.NewExplainHandler(gc))
+	http.HandleFunc("/summary", handler.NewSummaryHandler(gc))
+	http.HandleFunc("/glossary", handler.NewGlossaryHandler(gc))
 
 	log.Printf("Server starting on port %s", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
