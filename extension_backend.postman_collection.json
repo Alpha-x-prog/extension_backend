@@ -1,0 +1,259 @@
+{
+  "info": {
+    "name": "Extension Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "explain",
+      "item": [
+        {
+          "name": "200 OK",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/explain",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Когда мы разговариваем о микросервисах, обычно возникает вопрос о том, не является ли это обычным Service Oriented Architecture (SOA), который мы видели десять лет назад.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 пустой text",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/explain",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 невалидный JSON",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/explain",
+            "body": {
+              "mode": "raw",
+              "raw": "не json вообще"
+            }
+          }
+        },
+        {
+          "name": "400 нет body",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/explain",
+            "body": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "name": "400 text превышает 5000 символов",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": ["pm.variables.set('longText', 'а'.repeat(5001));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/explain",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"{{longText}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "405 метод GET",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/explain"
+          }
+        }
+      ]
+    },
+    {
+      "name": "summary",
+      "item": [
+        {
+          "name": "200 OK",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/summary",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Микросервисы — это архитектурный подход, при котором приложение строится как набор небольших независимых сервисов. Каждый сервис выполняет одну бизнес-функцию и общается с другими через API. Это позволяет командам разрабатывать, деплоить и масштабировать сервисы независимо друг от друга. В отличие от монолита, где все компоненты связаны, микросервисы дают гибкость и изоляцию отказов. Однако они усложняют инфраструктуру и требуют настройки оркестрации, мониторинга и трассировки.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 text короче 300 символов",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/summary",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"слишком короткий текст\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 пустой text",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/summary",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 невалидный JSON",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/summary",
+            "body": {
+              "mode": "raw",
+              "raw": "не json"
+            }
+          }
+        },
+        {
+          "name": "413 text превышает 20000 символов",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": ["pm.variables.set('longText', 'а'.repeat(20001));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/summary",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"{{longText}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "405 метод GET",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/summary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "glossary",
+      "item": [
+        {
+          "name": "200 OK",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/glossary",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"REST API использует HTTP-методы GET, POST, PUT, DELETE. OAuth2 управляет аутентификацией через access token и refresh token. JSON — стандартный формат обмена данными между клиентом и сервером.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 text короче 100 символов",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/glossary",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"короткий\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 пустой text",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/glossary",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 невалидный JSON",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/glossary",
+            "body": {
+              "mode": "raw",
+              "raw": "не json"
+            }
+          }
+        },
+        {
+          "name": "413 text превышает 5000 символов",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": ["pm.variables.set('longText', 'а'.repeat(5001));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/glossary",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"{{longText}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "405 метод GET",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/glossary"
+          }
+        }
+      ]
+    }
+  ]
+}
