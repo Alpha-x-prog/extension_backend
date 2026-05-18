@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	GeminiModel = "gemini-2.5-flash"
+	GeminiModel = "gemini-2.5-flash-lite"
 	AITimeout   = 30 * time.Second
 )
 
