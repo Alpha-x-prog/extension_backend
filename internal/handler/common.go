@@ -18,6 +18,24 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
+// CORSMiddleware добавляет заголовки CORS ко всем ответам.
+// Также обрабатывает preflight-запросы (OPTIONS), которые браузер
+// отправляет перед основным запросом для проверки разрешений.
+func CORSMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
 // writeAIError maps service sentinel errors to the correct HTTP status codes.
 func writeAIError(w http.ResponseWriter, err error) {
 	switch err {

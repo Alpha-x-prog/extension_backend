@@ -25,9 +25,9 @@ func main() {
 		log.Fatalf("failed to create Gemini client: %v", err)
 	}
 
-	http.HandleFunc("/explain", handler.NewExplainHandler(gc))
-	http.HandleFunc("/summary", handler.NewSummaryHandler(gc))
-	http.HandleFunc("/glossary", handler.NewGlossaryHandler(gc))
+	http.HandleFunc("/explain", handler.CORSMiddleware(handler.NewExplainHandler(gc)))
+	http.HandleFunc("/summary", handler.CORSMiddleware(handler.NewSummaryHandler(gc)))
+	http.HandleFunc("/glossary", handler.CORSMiddleware(handler.NewGlossaryHandler(gc)))
 
 	log.Printf("Server starting on port %s", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
